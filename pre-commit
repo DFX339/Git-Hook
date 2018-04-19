@@ -1,0 +1,50 @@
+#!/bin/sh
+#execute shell before commit,check the code
+mvn clean package
+#得到项目打包结果，打包成功 执行结果为0；打包不成功 执行结果为非0
+package_result=$?
+if [ $package_result -eq 0 ]
+then 
+	echo "项目执行mvn清空、打包成功，继续执行findbugs检测"
+	mvn findbugs:check
+	#得到findbugs检测结果，没有bug 执行结果为0；有bug 执行结果为非0
+	findbugs_result=$?
+    if [ $findbugs_result -eq 0 ]
+    then 
+		echo "项目执行findbugs检测没有明显错误，继续执行checkstyle检测代码规范"
+		mvn checkstyle:check
+		#得到checkstyle检测结果，没有代码规范问题 执行结果为0；有代码规范问题 执行结果为非0
+		checkstyle_result=$?
+		if [ $checkstyle_result -eq 0 ]
+		then 
+			echo "项目执行checkstyle检测成功，继续执行jacoco检测代码覆盖率"
+			mvn jacoco:check
+			#得到jacoco检测结果，达到代码指定的覆盖率 执行结果为0；没有达到代码覆盖率 执行结果为非0
+			jacoco_result=$?
+			if [ $jacoco_result -eq 0 ]
+			then 
+				echo "提交成功，项目build成功！findbugs，checkstyle，jacoco检测都通过！请继续push！"
+				exit 0
+			else    
+				echo "提交失败，源于项目代码覆盖率没达到要求（mvn jacoco:check）"
+				echo "请查看target/site/jacoco/index.html文件得知详情"
+				exit 1
+			fi
+		else    
+			echo "提交失败，源于项目存在代码规范问题（mvn checkstyle:check）"
+			echo "请查看target目录下的checkstyle-result.html文件得知详情"
+			exit 1
+		fi
+    else   
+		echo "提交失败，源于项目存在bug（mvn findbugs:check）"
+		echo "请从弹出的findbugs:gui界面中查看错误详情"
+		mvn findbugs:gui
+		echo "请修正后重新提交！！！"
+		exit 1
+    fi
+else
+    echo "提交失败，源于项目清空或打包失败（mvn clean package）"
+	exit 1
+fi
+
+
